@@ -1,0 +1,4 @@
+{
+    "command": "./gradlew dependencies",
+    "working_directory": "/home/kavia/workspace/code-generation/android-tv-tetris-51301-51310/tetris_android_tv_frontend"
+}
