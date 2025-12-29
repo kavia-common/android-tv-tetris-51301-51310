@@ -78,13 +78,15 @@ data class BoardState(
     fun inBounds(c: Coord): Boolean = c.x in 0 until width && c.y in 0 until height
 
     /** Returns true if any cell at provided coordinates is filled or out of bounds.
-     * Allows negative y for spawn entry (above the board) without collision.
+     * Production behavior:
+     * - Horizontal bounds are strict (collide when outside [0,width)).
+     * - Vertical: allow y < 0 (spawn area above board) to not collide.
+     * - Collide when y >= height (below board).
+     * - Collide when y within [0,height) and the target cell is filled.
      */
     fun collides(coords: List<Coord>): Boolean {
         for (c in coords) {
-            // Horizontal bounds must be respected
             if (c.x !in 0 until width) return true
-            // Allow y to be -infinity..height-1; only collide if within visible board and filled
             if (c.y >= height) return true
             if (c.y >= 0 && get(c.x, c.y).filled) return true
         }

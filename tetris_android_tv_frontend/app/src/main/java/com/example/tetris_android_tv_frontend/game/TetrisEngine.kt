@@ -91,6 +91,10 @@ class TetrisEngine(
     }
 
     // PUBLIC_INTERFACE
+    /** Soft drop: repeatedly moves the active piece down until blocked by one cell at a time.
+     * Scoring: +1 point per cell, as per classic guideline.
+     * Returns number of cells descended.
+     */
     fun softDrop(): Int {
         if (over) return 0
         val a0 = active ?: return 0
@@ -110,6 +114,11 @@ class TetrisEngine(
     }
 
     // PUBLIC_INTERFACE
+    /** Hard drop: instantly drops active piece to the lowest legal position.
+     * Scoring: +2 points per cell.
+     * Locks the piece and proceeds to line clear/spawn.
+     * Returns number of cells descended.
+     */
     fun hardDrop(): Int {
         if (over) return 0
         val a0 = active ?: return 0
@@ -142,6 +151,12 @@ class TetrisEngine(
     fun rotateCCW(): Boolean = rotate(apply = Rotation::ccw)
 
     // PUBLIC_INTERFACE
+    /** Hold mechanic:
+     * - If no held piece: stores current active into hold and pulls next from queue.
+     * - If a piece is held: swaps active with held without consuming queue.
+     * - canHold prevents consecutive holds until after lock.
+     * Returns true on successful hold/swap; false if unavailable or results in game over due to spawn collision.
+     */
     fun hold(): Boolean {
         if (!enableHold || !canHold || over) return false
         val current = active ?: return false
@@ -197,6 +212,10 @@ class TetrisEngine(
         return if (!board.collides(next.blocks())) next else null
     }
 
+    /** Locks the current active piece onto the board.
+     * Ignores blocks above visible board (y < 0) during lock to allow proper top-out detection.
+     * Clears lines, updates score/level, re-enables hold, and spawns the next piece.
+     */
     private fun lockActiveAndProceed() {
         val a = active ?: return
         // Place blocks onto board
@@ -250,7 +269,9 @@ class TetrisEngine(
     }
 
     private fun spawnPosition(type: TetrominoType): PieceState {
-        // Standardized spawn: horizontally centered, just above visible board (y = -1)
+        // Standardized spawn: horizontally centered, one row above the visible playfield (y = -1)
+        // For 10-wide boards, center column is 5; origin.x=width/2 is acceptable.
+        // Rotation SPAWN used for all piece types.
         val centerX = width / 2
         val origin = Coord(centerX, -1)
         return PieceState(type, Rotation.SPAWN, origin)
