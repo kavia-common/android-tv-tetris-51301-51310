@@ -142,11 +142,9 @@ class TetrisEngine(
         if (!enableHold || !canHold || over) return false
         val current = active ?: return false
 
-        // Incoming is either the held type, or the next in queue if none is held
-        val incomingType = hold ?: nextFromQueue()
-        // Place current type into hold
-        hold = current.type
-        // Prevent consecutive hold until lock
+        val incomingType = resolveHoldIncoming(current.type)
+
+        // Prevent consecutive hold until piece is locked
         canHold = false
 
         val spawn = spawnPosition(incomingType)
@@ -154,6 +152,7 @@ class TetrisEngine(
             active = spawn
             true
         } else {
+            // If the incoming piece cannot spawn, the game is over
             over = true
             active = null
             false
@@ -198,10 +197,12 @@ class TetrisEngine(
         // Place blocks onto board
         var b = board
         for (c in a.blocks()) {
+            // Ignore blocks above the board (y < 0) on lock to prevent premature game over
+            if (c.y < 0) continue
             if (b.inBounds(c)) {
                 b = b.set(c.x, c.y, BoardCell(true, a.type))
             } else {
-                // Out of bounds while locking => game over
+                // If block is below or outside horizontal bounds, it's a game over
                 over = true
                 active = null
                 board = b
@@ -244,8 +245,8 @@ class TetrisEngine(
     }
 
     private fun spawnPosition(type: TetrominoType): PieceState {
-        // Spawn near top middle
-        val origin = Coord(width / 2, 0)
+        // Spawn near the horizontal center; y at -1 allows gravity/ticks to enter smoothly
+        val origin = Coord(width / 2, -1)
         return PieceState(type, Rotation.SPAWN, origin)
     }
 
@@ -276,7 +277,7 @@ class TetrisEngine(
     }
 
     private fun scoreStateAfterClear(prev: ScoreState, cleared: Int): ScoreState {
-        // Standard Tetris line clear scoring (base values multiplied by current level)
+        // Standard Tetris line clear scoring (base values multiplied by current level).
         val base = when (cleared) {
             1 -> 100 // single
             2 -> 300 // double
@@ -287,11 +288,26 @@ class TetrisEngine(
         val newLines = prev.totalLines + cleared
         // Level increases after each 10 lines cleared total
         val newLevel = 1 + (newLines / 10)
-        val add = base * prev.level
+        // Apply multiplier with the updated level
+        val add = base * newLevel
         return ScoreState(
             score = prev.score + add,
             level = newLevel,
             totalLines = newLines
         )
+    }
+
+    /** Resolve which piece should become active after a hold operation. */
+    private fun resolveHoldIncoming(currentType: TetrominoType): TetrominoType {
+        return if (hold == null) {
+            // First hold: stash current, pull next from queue
+            hold = currentType
+            nextFromQueue()
+        } else {
+            // Swap with held piece without consuming queue
+            val fromHold = hold!!
+            hold = currentType
+            fromHold
+        }
     }
 }
