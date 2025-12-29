@@ -151,6 +151,32 @@ class TetrisEngine(
     fun rotateCCW(): Boolean = rotate(apply = Rotation::ccw)
 
     // PUBLIC_INTERFACE
+    /**
+     * Returns true if the active piece cannot move down by one cell (i.e., is on ground).
+     * If game is over or no active piece exists, returns false.
+     */
+    fun isActiveOnGround(): Boolean {
+        if (over) return false
+        val a = active ?: return false
+        val moved = tryMove(a, Coord(0, 1))
+        return moved == null
+    }
+
+    // PUBLIC_INTERFACE
+    /**
+     * Attempts to nudge the active piece down by one cell without scoring.
+     * Returns true if moved; false if blocked. Does not lock by itself.
+     * Primarily for runtime checks; gravity should still be driven via tickGravity().
+     */
+    fun tryStepDown(): Boolean {
+        if (over) return false
+        val a = active ?: return false
+        val moved = tryMove(a, Coord(0, 1)) ?: return false
+        active = moved
+        return true
+    }
+
+    // PUBLIC_INTERFACE
     /** Hold mechanic:
      * - If no held piece: stores current active into hold and pulls next from queue.
      * - If a piece is held: swaps active with held without consuming queue.
