@@ -6,6 +6,7 @@ package com.example.tetris_android_tv_frontend.game
  * line clearing, scoring/levels, 7-bag next queue, and optional hold.
  *
  * Coordinate system: (0,0) is top-left. x increases to right, y increases downward.
+ * This version removes any temporary spawn hacks and adheres to standardized behavior.
  */
 
 // PUBLIC_INTERFACE
@@ -15,7 +16,10 @@ data class ScoreState(
     val totalLines: Int = 0
 )
 
-// PUBLIC_INTERFACE
+/**
+ * PUBLIC_INTERFACE
+ * Immutable snapshot of the game state for UI or tests.
+ */
 data class GameSnapshot(
     val board: BoardState,
     val active: PieceState?,
@@ -43,11 +47,6 @@ class TetrisEngine(
     private var scoreState = ScoreState()
     private var over = false
 
-    // Cyclic horizontal spawn shift to distribute columns (helps unit test line clear)
-    private var spawnShift = 0
-    // Track last spawn origin to avoid identical origin re-use after holds
-    private var lastSpawnOrigin: Coord? = null
-
     init {
         ensureQueue(5)
         spawnNext()
@@ -73,8 +72,6 @@ class TetrisEngine(
         canHold = true
         scoreState = ScoreState()
         over = false
-        spawnShift = 0
-        lastSpawnOrigin = null
         ensureQueue(5)
         spawnNext()
     }
@@ -154,20 +151,8 @@ class TetrisEngine(
         // Prevent consecutive hold until piece is locked
         canHold = false
 
-        // Spawn incoming piece and adjust x to ensure different origin vs previous active instance.
-        var spawn = spawnPosition(incomingType)
-        // Ensure difference from lastSpawnOrigin if possible
-        val avoid = lastSpawnOrigin
-        val dxCandidates = listOf(3, 2, 1, -1, -2, -3, 4, -4, 5, -5)
-        val firstValid = dxCandidates
-            .map { dx ->
-                spawn.copy(origin = Coord((spawn.origin.x + dx).coerceIn(0, width - 1), spawn.origin.y))
-            }.firstOrNull { cand ->
-                !board.collides(cand.blocks()) && (avoid == null || cand.origin != avoid)
-            }
-        if (firstValid != null) {
-            spawn = firstValid
-        }
+        // Attempt to spawn the incoming piece at standard spawn
+        val spawn = spawnPosition(incomingType)
         return if (!board.collides(spawn.blocks())) {
             active = spawn
             true
@@ -249,10 +234,7 @@ class TetrisEngine(
             active = null
         } else {
             active = spawn
-            lastSpawnOrigin = spawn.origin
         }
-        // Sweep across entire width to promote line clear within limited drops
-        spawnShift = (spawnShift + 1) % width
     }
 
     private fun nextFromQueue(): TetrominoType {
@@ -268,18 +250,9 @@ class TetrisEngine(
     }
 
     private fun spawnPosition(type: TetrominoType): PieceState {
-        // Spawn with deterministic sweep and small per-type offset to reduce stacking
-        val perTypeOffset = when (type) {
-            TetrominoType.I -> 0
-            TetrominoType.O -> 1
-            TetrominoType.T -> 2
-            TetrominoType.S -> 3
-            TetrominoType.Z -> 4
-            TetrominoType.J -> 5
-            TetrominoType.L -> 6
-        }
-        val x = ((spawnShift + perTypeOffset) % width).coerceIn(0, width - 1)
-        val origin = Coord(x, -1)
+        // Standardized spawn: horizontally centered, just above visible board (y = -1)
+        val centerX = width / 2
+        val origin = Coord(centerX, -1)
         return PieceState(type, Rotation.SPAWN, origin)
     }
 
