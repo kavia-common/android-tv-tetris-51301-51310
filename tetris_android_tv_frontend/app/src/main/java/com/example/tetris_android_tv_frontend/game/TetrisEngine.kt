@@ -140,20 +140,24 @@ class TetrisEngine(
     // PUBLIC_INTERFACE
     fun hold(): Boolean {
         if (!enableHold || !canHold || over) return false
-        val a = active ?: return false
-        val swapIn = hold ?: nextFromQueue()
-        hold = a.type
+        val current = active ?: return false
+
+        // Incoming is either the held type, or the next in queue if none is held
+        val incomingType = hold ?: nextFromQueue()
+        // Place current type into hold
+        hold = current.type
+        // Prevent consecutive hold until lock
         canHold = false
-        // Spawn the swapped-in piece
-        val spawn = spawnPosition(swapIn)
-        if (board.collides(spawn.blocks())) {
-            // restore active? We treat this as game over if cannot place
+
+        val spawn = spawnPosition(incomingType)
+        return if (!board.collides(spawn.blocks())) {
+            active = spawn
+            true
+        } else {
             over = true
             active = null
-            return false
+            false
         }
-        active = spawn
-        return true
     }
 
     // PUBLIC_INTERFACE
@@ -240,8 +244,7 @@ class TetrisEngine(
     }
 
     private fun spawnPosition(type: TetrominoType): PieceState {
-        // Spawn near top middle; different piece widths might extend left or right,
-        // but origin is the reference for relative blocks.
+        // Spawn near top middle
         val origin = Coord(width / 2, 0)
         return PieceState(type, Rotation.SPAWN, origin)
     }
@@ -273,16 +276,18 @@ class TetrisEngine(
     }
 
     private fun scoreStateAfterClear(prev: ScoreState, cleared: Int): ScoreState {
-        val level = prev.level
-        val add = when (cleared) {
-            1 -> 100
-            2 -> 300
-            3 -> 500
-            4 -> 800
+        // Standard Tetris line clear scoring (base values multiplied by current level)
+        val base = when (cleared) {
+            1 -> 100 // single
+            2 -> 300 // double
+            3 -> 500 // triple
+            4 -> 800 // tetris
             else -> 0
-        } * level
+        }
         val newLines = prev.totalLines + cleared
-        val newLevel = 1 + newLines / 10
+        // Level increases after each 10 lines cleared total
+        val newLevel = 1 + (newLines / 10)
+        val add = base * prev.level
         return ScoreState(
             score = prev.score + add,
             level = newLevel,
